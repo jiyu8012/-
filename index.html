@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rouge Ensemble - Official</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #050505;
+            --primary-red: #d41d24;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --accent-glow: rgba(212, 29, 36, 0.5);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; scroll-behavior: smooth; -webkit-tap-highlight-color: transparent; }
+        body {
+            background-color: var(--bg-dark);
+            color: #fff;
+            font-family: 'Noto Sans KR', sans-serif;
+            overflow-x: hidden;
+            cursor: pointer;
+        }
+        body.modal-open { overflow: hidden; }
+
+        /* 커튼 레이어 */
+        #curtain-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 9999; display: flex; justify-content: center; align-items: center;
+            pointer-events: all;
+            transition: visibility 2.5s; 
+        }
+        
+        #curtain-layer.open { 
+            pointer-events: none; 
+            visibility: hidden; 
+        }
+
+        /* 커튼 패널 */
+        .curtain-panel {
+            position: absolute; top: 0; width: 51%; height: 100%;
+            background: 
+                repeating-linear-gradient(90deg, 
+                    #0f0000 0%, 
+                    #2a0000 4%, 
+                    #500000 8%, 
+                    #2a0000 12%, 
+                    #0f0000 16%
+                );
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9), 10px 0 30px rgba(0,0,0,0.8);
+            transition: transform 2.2s cubic-bezier(0.19, 1, 0.22, 1);
+            z-index: 2;
+        }
+
+        .curtain-panel::after {
+            content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 15px;
+            background: #0f0000;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.8);
+        }
+
+        .curtain-left { left: 0; }
+        .curtain-right { right: 0; }
+
+        /* 커튼 텍스트 */
+        .curtain-content {
+            z-index: 3; text-align: center; color: #fff;
+            transition: opacity 0.5s ease-out;
+            text-shadow: 0 10px 40px rgba(0,0,0,0.9);
+        }
+        .curtain-content h1 { 
+            font-family: 'Cinzel'; font-size: 3.5rem; margin-bottom: 15px; 
+            color: #fff; text-shadow: 0 0 20px #800000;
+        }
+        .curtain-content p { 
+            font-size: 1rem; letter-spacing: 6px; opacity: 0.7; 
+            text-transform: uppercase; color: #ccc;
+            animation: pulse 2s infinite;
+        }
+
+        /* 커튼 열림 애니메이션 */
+        #curtain-layer.open .curtain-left { transform: translateX(-100%); }
+        #curtain-layer.open .curtain-right { transform: translateX(100%); }
+        #curtain-layer.open .curtain-content { opacity: 0; }
+
+        @keyframes pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 0.3; } }
+
+        /* 초기에는 메인 화면 요소들을 숨김 (오파시티 0) */
+        nav, header, .music-player, .rose-shower {
+            opacity: 0;
+            transition: opacity 3s ease-in-out;
+        }
+
+        /* 커튼이 열리면(body.started) 보이게 함 */
+        body.started nav, 
+        body.started header, 
+        body.started .music-player,
+        body.started .rose-shower {
+            opacity: 1;
+        }
+
+        /* 배경 효과 */
+        .background-effects { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: radial-gradient(circle at 60% 30%, #1a0505 0%, #050505 80%); }
+        .spotlight { position: absolute; top: -20%; right: -10%; width: 80vw; height: 120vh; background: radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 60%); transform: rotate(-15deg); pointer-events: none; filter: blur(30px); }
+        .rose-shower { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+        .petal { position: absolute; background: var(--primary-red); border-radius: 150% 0; filter: drop-shadow(0 0 3px rgba(0,0,0,0.5)); animation: fall linear forwards; }
+        @keyframes fall { from { transform: translateY(-10vh) rotate(0deg); opacity: 0; } 10% { opacity: 0.7; } to { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+
+        /* BGM 컨트롤러 */
+        .music-player { 
+            position: fixed; bottom: 30px; left: 30px; z-index: 1100; 
+            display: flex; align-items: center; gap: 15px; 
+            padding: 10px 20px; background: rgba(0,0,0,0.7); 
+            border: 1px solid var(--glass-border); border-radius: 30px; 
+            backdrop-filter: blur(10px); transition: 0.3s; 
+        }
+        .music-player:hover { border-color: var(--primary-red); }
+        .play-icon { width: 10px; height: 12px; background: var(--primary-red); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+        .music-player.playing .play-icon { clip-path: none; background: none; border-left: 3px solid var(--primary-red); border-right: 3px solid var(--primary-red); width: 10px; }
+        .music-text { font-family: 'Cinzel'; font-size: 0.7rem; letter-spacing: 2px; color: #bbb; }
+
+        /* 내비게이션 */
+        nav { position: fixed; top: 0; width: 100%; padding: 20px 4%; display: flex; align-items: center; z-index: 1000; background: linear-gradient(to bottom, rgba(5,5,5,0.9), transparent); transition: 0.3s; }
+        .logo { font-family: 'Cinzel', serif; font-size: 1.5rem; font-weight: 900; letter-spacing: 2px; margin-right: auto; }
+        .logo span { color: var(--primary-red); }
+        .nav-links { display: flex; gap: 30px; }
+        .nav-links a { color: #999; text-decoration: none; font-size: 0.8rem; letter-spacing: 1px; text-transform: uppercase; transition: 0.3s; position: relative; }
+        .nav-links a::after { content: ''; position: absolute; bottom: -5px; left: 0; width: 0; height: 1px; background: var(--primary-red); transition: 0.3s; }
+        .nav-links a:hover { color: #fff; }
+        .nav-links a:hover::after { width: 100%; }
+
+        /* 히어로 섹션 */
+        header { height: 90vh; display: flex; align-items: center; padding: 0 10%; position: relative; }
+        .hero-content { text-align: left; z-index: 1; }
+        .hero-content h1 { font-family: 'Cinzel', serif; font-size: 6rem; line-height: 0.9; margin-bottom: 15px; }
+        .hero-content h1 span { display: block; font-size: 3rem; color: var(--primary-red); }
+        .hero-content p { font-size: 1.1rem; letter-spacing: 5px; opacity: 0.6; text-transform: uppercase; margin-left: 5px; }
+        .hero-deco { position: absolute; right: 5%; top: 25%; font-family: 'Cinzel'; font-size: 15rem; color: rgba(212, 29, 36, 0.03); z-index: 0; pointer-events: none; }
+
+        /* 섹션 공통 */
+        section { padding: 140px 8%; }
+        .section-header { display: flex; align-items: flex-end; margin-bottom: 60px; border-bottom: 1px solid var(--glass-border); padding-bottom: 20px; }
+        .section-title { font-family: 'Cinzel'; font-size: 2.5rem; letter-spacing: 3px; margin-right: 20px; }
+        .section-subtitle { font-size: 0.9rem; letter-spacing: 2px; color: var(--primary-red); opacity: 0.8; padding-bottom: 5px; }
+
+        /* 캐릭터 그리드 */
+        .character-stage { 
+            display: flex; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+            gap: 40px; 
+            padding-top: 20px; 
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .break-line { flex-basis: 100%; height: 0; margin: 0; }
+
+        .char-card { 
+            width: 260px; 
+            position: relative; 
+            transition: 0.5s cubic-bezier(0.25, 0.8, 0.25, 1); 
+            cursor: pointer; 
+        }
+        
+        .img-frame { 
+            position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; 
+            border: 1px solid var(--glass-border); background: var(--glass);
+        }
+        .img-frame::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(255,255,255,0.1); margin: 5px; pointer-events: none; transition: 0.5s; }
+        .img-frame img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(50%) contrast(1.1); transition: 0.5s; }
+        .char-info { text-align: center; padding-top: 15px; transition: 0.5s; }
+        .char-info h3 { font-family: 'Cinzel'; font-size: 1.2rem; margin-bottom: 5px; }
+        .char-info p { font-size: 0.75rem; color: var(--primary-red); text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
+        
+        .char-card:hover { transform: translateY(-15px) scale(1.02); z-index: 10; }
+        .char-card:hover .img-frame { border-color: var(--primary-red); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        .char-card:hover .img-frame::after { margin: 0; border-color: rgba(212, 29, 36, 0.3); }
+        .char-card:hover .img-frame img { filter: grayscale(0%) contrast(1); transform: scale(1.05); }
+        .char-card:hover .char-info p { opacity: 1; }
+
+        /* 콘텐츠 박스 */
+        .content-layout { display: flex; gap: 40px; align-items: center; margin-bottom: 100px; }
+        .content-layout:last-child { margin-bottom: 0; }
+        .content-text { flex: 1; text-align: right; }
+        .content-text h3 { font-family: 'Cinzel'; font-size: 1.8rem; margin-bottom: 10px; }
+        .content-text p { font-size: 0.9rem; opacity: 0.6; line-height: 1.6; }
+        
+        .content-box { 
+            flex: 2; 
+            height: 850px;
+            background: transparent; 
+            border: none; 
+            position: relative; overflow: hidden; 
+            display: flex; justify-content: center; align-items: center;
+        }
+        .content-box img { width: 100%; height: 100%; object-fit: contain; }
+
+        #schedule .content-layout { flex-direction: row-reverse; }
+        #schedule .content-text { text-align: left; }
+        #schedule .content-box { height: 1000px; }
+
+        footer { padding: 80px; text-align: center; opacity: 0.3; font-size: 0.8rem; letter-spacing: 1px; border-top: 1px solid var(--glass-border); }
+
+        /* 모달 스타일 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 2000;
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: 0.4s;
+            backdrop-filter: blur(8px); padding: 20px;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-content {
+            width: 100%; max-width: 900px; height: 80vh; max-height: 800px;
+            background: linear-gradient(135deg, #110000, #0a0a0a);
+            border: 1px solid var(--primary-red);
+            display: flex; overflow: hidden; border-radius: 5px;
+            box-shadow: 0 0 50px rgba(212, 29, 36, 0.4);
+            transform: translateY(30px) scale(0.95); transition: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+        }
+        .modal-overlay.active .modal-content { transform: translateY(0) scale(1); }
+        .modal-img-box { flex: 1; position: relative; overflow: hidden; }
+        .modal-img-box img { width: 100%; height: 100%; object-fit: cover; filter: contrast(1.1); }
+        .modal-text-box { flex: 1; padding: 40px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .close-modal { position: absolute; top: 15px; right: 20px; font-size: 2.5rem; color: #fff; text-shadow: 0 0 10px var(--primary-red); cursor: pointer; z-index: 20; }
+        .detail-title { font-family: 'Cinzel'; font-size: 2.2rem; margin-bottom: 5px; color: var(--primary-red); line-height: 1.1; }
+        .detail-subtitle { font-size: 0.95rem; opacity: 0.8; margin-bottom: 25px; display: block; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
+        .detail-info { list-style: none; margin-bottom: 30px; }
+        .detail-info li { margin-bottom: 12px; line-height: 1.6; font-size: 0.95rem; }
+        .detail-info strong { color: var(--primary-red); display: inline-block; min-width: 50px; }
+        .secret-box { padding: 20px; background: rgba(212, 29, 36, 0.08); border-left: 2px solid var(--primary-red); }
+        .secret-title { font-family: 'Cinzel'; color: var(--primary-red); margin-bottom: 10px; display: block; font-size: 1.1rem; }
+
+        @media (max-width: 1024px) {
+            .character-stage { gap: 20px; }
+            .char-card { width: calc(45% - 10px); } 
+            .content-layout, #schedule .content-layout { flex-direction: column !important; text-align: left !important; align-items: flex-start !important; }
+            .content-text { text-align: left !important; margin-bottom: 20px; width: 100%; }
+            .content-box, #schedule .content-box { width: 100%; height: auto; aspect-ratio: auto; }
+        }
+
+        @media (max-width: 768px) {
+            nav { flex-direction: column; padding: 15px; height: auto; background: rgba(5,5,5,0.95); }
+            .logo { margin-bottom: 10px; margin-right: 0; }
+            .nav-links { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; width: 100%; }
+            .nav-links a { font-size: 0.75rem; }
+            
+            header { justify-content: center; padding: 0 5%; text-align: center; height: 80vh; }
+            .hero-content h1 { font-size: 3.8rem; } .hero-content h1 span { font-size: 2rem; }
+            .hero-deco { display: none; }
+            .character-stage { gap: 15px; }
+            .char-card { width: calc(50% - 10px); min-width: auto; }
+            .content-box, #schedule .content-box { width: 100%; height: auto; min-height: 400px; padding: 0; background: transparent; border: none; }
+            .content-box img, #schedule .content-box img { width: 100%; height: auto; object-fit: cover; }
+            .modal-content { flex-direction: column; height: 85vh; max-height: none; }
+            .modal-img-box { flex: 0 0 40%; }
+            .modal-text-box { flex: 1; padding: 25px; }
+            .music-player { bottom: 20px; left: 20px; padding: 8px 15px; }
+            .music-text { display: none; }
+            .play-icon { width: 12px; height: 14px; }
+            .curtain-content h1 { font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="orchestraBgm" loop preload="auto">
+        <source src="https://cheerful-fudge-ac30a5.netlify.app/rouge_ensemble.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="themePlayer" loop preload="auto"></audio>
+
+    <div id="curtain-layer" onclick="openCurtain()">
+        <div class="curtain-panel curtain-left"></div>
+        <div class="curtain-panel curtain-right"></div>
+        <div class="curtain-content">
+            <h1>Rouge Ensemble</h1>
+            <p>Tap to Start</p>
+        </div>
+    </div>
+
+    <div id="musicToggle" class="music-player" onclick="toggleMusic(event)">
+        <div class="play-icon"></div>
+        <div class="music-text" id="statusText">BGM START</div>
+    </div>
+
+    <div class="background-effects">
+        <div class="spotlight"></div>
+    </div>
+    <div class="rose-shower" id="roseShower"></div>
+
+    <nav>
+        <div class="logo">ROUGE <span>.ENS</span></div>
+        <div class="nav-links">
+            <a href="#profile">Virtuosos</a>
+            <a href="#structure">Mansion</a>
+            <a href="#schedule">Plan</a>
+        </div>
+    </nav>
+
+    <header>
+        <div class="hero-content">
+            <h1><span>Rouge</span>Ensemble</h1>
+            <p>The Crimson Symphony Begins</p>
+        </div>
+        <div class="hero-deco">R</div>
+    </header>
+
+    <section id="profile">
+        <div class="section-header">
+            <h2 class="section-title">The Virtuosos</h2>
+            <span class="section-subtitle">TAP CARD FOR DETAIL</span>
+        </div>
+        
+        <div class="character-stage">
+            <div class="char-card" data-char="dominic">
+                <div class="img-frame"><img src="https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/cc1ff1eb-b3cb-489f-88a5-e58786bcb32f.png" alt="Dominic"></div>
+                <div class="char-info"><h3>Dominic</h3><p>Conductor</p></div>
+            </div>
+
+            <div class="break-line"></div>
+
+            <div class="char-card" data-char="lucas">
+                <div class="img-frame"><img src="https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/ab8a728f-e162-4114-a8a9-db69b04a81dd.jpeg" alt="Lucas"></div>
+                <div class="char-info"><h3>Lucas</h3><p>Pianist</p></div>
+            </div>
+            <div class="char-card" data-char="etienne">
+                <div class="img-frame"><img src="https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/a9e43df1-e4f7-4e6b-8fd6-0c68a8a5b4a2.png" alt="Etienne"></div>
+                <div class="char-info"><h3>Etienne</h3><p>Violinist</p></div>
+            </div>
+
+            <div class="break-line"></div>
+
+            <div class="char-card" data-char="aidan">
+                <div class="img-frame"><img src="https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/b41f6ad1-a08f-41f4-9100-630565a11e05.png" alt="Aidan"></div>
+                <div class="char-info"><h3>Aidan</h3><p>Trumpeter</p></div>
+            </div>
+            <div class="char-card" data-char="gideon">
+                <div class="img-frame"><img src="https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/3b14bf2a-1d24-494d-bd0f-340cdb1c59d2.jpeg" alt="Gideon"></div>
+                <div class="char-info"><h3>Gideon</h3><p>Timpanist</p></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="structure">
+        <div class="section-header">
+            <h2 class="section-title">The Mansion</h2>
+            <span class="section-subtitle">Secret Hideout</span>
+        </div>
+        <div class="content-layout">
+            <div class="content-text">
+                <h3>Rouge Residency</h3>
+                <p>멤버들의 프라이빗한 생활 공간. 1층 멤버 숙소부터 최상층 지휘자의 펜트하우스까지, 철저한 보안 속에 감춰진 요새입니다.</p>
+            </div>
+            <div class="content-box">
+                <img src="https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/c33f6dc7-59e1-4f65-bfbf-382e08caeb62.jpeg" alt="Rouge Residency">
+            </div>
+        </div>
+        <div class="content-layout" style="flex-direction: row-reverse;">
+            <div class="content-text" style="text-align: left;">
+                <h3>Bankside Atelier</h3>
+                <p>영감이 피어나는 연습 공간. 1층 메인 홀과 2층 파트별 스튜디오, 그리고 프라이빗 라운지가 위치한 창작의 산실입니다.</p>
+            </div>
+            <div class="content-box">
+                <img src="https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/53009cb8-e759-4377-bf7d-0efd3c08056c.jpeg" alt="Bankside Atelier">
+            </div>
+        </div>
+    </section>
+
+    <section id="schedule">
+        <div class="section-header">
+            <h2 class="section-title">Weekly Plan</h2>
+            <span class="section-subtitle">Operation Schedule</span>
+        </div>
+        <div class="content-layout">
+            <div class="content-text">
+                <h3>Official Schedule</h3>
+                <p>루즈 앙상블의 공식 스케줄. 정기 공연부터 개별 리허설, 월드 투어 일정까지 상세한 작전 계획이 담겨있습니다.</p>
+            </div>
+            <div class="content-box">
+                <img src="https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/1d503549-25f5-4fcb-99b1-32e7b60cde13.jpeg" alt="Official Schedule">
+            </div>
+        </div>
+    </section>
+
+    <footer>&copy; 2026 ROUGE ENSEMBLE. ALL RIGHTS RESERVED.</footer>
+
+    <div class="modal-overlay" id="charModal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <div class="modal-img-box">
+                <img id="modalImg" src="" alt="Character Detail">
+            </div>
+            <div class="modal-text-box">
+                <h3 class="detail-title" id="modalTitle"></h3>
+                <span class="detail-subtitle" id="modalSubtitle"></span>
+                <ul class="detail-info" id="modalInfo"></ul>
+                <div class="secret-box">
+                    <span class="secret-title">※ SECRET ※</span>
+                    <div id="modalSecret"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const audio = document.getElementById('orchestraBgm');
+        const themePlayer = document.getElementById('themePlayer');
+        const toggleBtn = document.getElementById('musicToggle');
+        const statusText = document.getElementById('statusText');
+        const curtain = document.getElementById('curtain-layer');
+        let isStarted = false;
+        let mainAudioStateBeforeModal = true;
+
+        function openCurtain() {
+            if (isStarted) return;
+            audio.play().then(() => {
+                isStarted = true;
+                toggleBtn.classList.add('playing');
+                statusText.innerText = "BGM ON";
+            }).catch(e => console.log(e));
+            curtain.classList.add('open');
+            document.body.classList.add('started');
+        }
+
+        function toggleMusic(e) {
+            e.stopPropagation(); 
+            if (!isStarted) return; 
+            if (audio.paused) { 
+                audio.play(); 
+                toggleBtn.classList.add('playing'); 
+                statusText.innerText = "BGM ON"; 
+            } else { 
+                audio.pause(); 
+                toggleBtn.classList.remove('playing'); 
+                statusText.innerText = "BGM OFF"; 
+            }
+        }
+
+        const shower = document.getElementById('roseShower');
+        function createPetal() {
+            const petal = document.createElement('div');
+            petal.className = 'petal';
+            const size = Math.random() * 10 + 5 + 'px';
+            petal.style.width = size; petal.style.height = size;
+            petal.style.left = Math.random() * 100 + 'vw';
+            petal.style.animationDuration = Math.random() * 5 + 5 + 's';
+            petal.style.opacity = Math.random() * 0.5 + 0.2;
+            petal.style.borderRadius = `${Math.random()*100}% 0`;
+            shower.appendChild(petal);
+            setTimeout(() => petal.remove(), 10000);
+        }
+        setInterval(createPetal, 300);
+
+        window.addEventListener('scroll', () => {
+            const nav = document.querySelector('nav');
+            nav.style.background = window.scrollY > 50 ? 'rgba(5,5,5,0.95)' : 'linear-gradient(to bottom, rgba(5,5,5,0.9), transparent)';
+        });
+
+        const charData = {
+            dominic: {
+                img: "https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/843b86b1-21cb-416d-a1a8-3b81ce03c38f.jpeg",
+                theme: "https://cheerful-fudge-ac30a5.netlify.app/dominic_mix.mp3",
+                title: "Dominic Vane",
+                subtitle: "도미닉 베인 / 38세 / 영국 런던 출신 / 지휘자 (악단 내 절대 군주)",
+                info: `<li>망해가는 악단을 취임 5년만에 세계에서 손 꼽히는 풀 편성 오케스트라로 일으켜 세움.</li>
+                       <li><strong>외형:</strong> 흑발 웨이브, 적안, 188cm</li>
+                       <li><strong>성격:</strong> ENTJ / 1w9 / Master 성향<br>- 통제광, 냉혈한, 완벽주의<br>- 감정보다는 논리, 효율 중시</li>
+                       <li><strong>Sexuality:</strong> 통제와 복종, 도구를 사용한 훈육, 상대에게 섹스 1번당 키스 마크 1개 남기는 버릇</li>`,
+                secret: `<p>루카스와 섹스하는 사이. 연인 X, 감정 X.<br>불면증. 단 거 안 좋아하는 척 (누텔라가 최애)</p>`
+            },
+            lucas: {
+                img: "https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/242ccf45-c4a5-4f27-9055-f7a62c1807f1.jpeg",
+                theme: "https://cheerful-fudge-ac30a5.netlify.app/lucas_mix.mp3",
+                title: "Lucas de Valois",
+                subtitle: "루카스 드 발루아 / 31세 / 프랑스 파리 출신 / 피아니스트 (고정 객원)",
+                info: `<li>고스트 핸드라 불리우는 천재 피아니스트. 프리랜서 객원이지만 루즈 앙상블이 마음에 들어 눌러 앉음.</li>
+                       <li><strong>외형:</strong> 플래티넘 블론드 헤어, 카페오레색 눈동자, 178cm</li>
+                       <li><strong>성격:</strong> ENTP / 7w6 / switch 성향<br>- 유혹적, 나른함, 다정함<br>- 겉으론 다정하나 속은 알 수 없는 여우 스타일</li>
+                       <li><strong>Sexuality:</strong> 감각적인 쾌락 즐김, 분위기에 따라 공수 전환 유연함.<br>자신의 손으로 애무할 때 상대가 쾌감을 느끼는 것에 희열을 느끼며 흥분함.</li>`,
+                secret: `<p>도미닉과 섹스하는 사이(객원인데 딴 데 안 가는 가장 큰 이유). 연인 X, 감정 X.<br>늘 목에 붙이는 반창고는 도미닉이 남긴 키스 마크 가리기용</p>`
+            },
+            etienne: {
+                img: "https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/eeaefc03-b912-4c63-b728-cac2d0e49ad7.png",
+                theme: "https://cheerful-fudge-ac30a5.netlify.app/etienne_mix.mp3",
+                title: "Etienne de Laurent",
+                subtitle: "에티엔 드 로랑 / 27세 / 프랑스 마르세유 출신 / 바이올리니스트 (악장)",
+                info: `<li>3살 때부터 영재 소리를 들어온 천재. 하지만 그 위상을 지키려 손가락이 찢어지도록 연습함.</li>
+                       <li><strong>외형:</strong> 라벤더색에 포인트 블루와 레드가 섞인 헤어, 핑크색 눈동자, 176cm</li>
+                       <li><strong>성격:</strong> ISFP / 4w5 / Masochist 성향<br>- 예민함, 탐미주의, 츤데레, 잘난 척<br>- 톡 쏘고 뼈 있는 말투. 그 뼈는 걱정일 수도 있음</li>
+                       <li><strong>Sexuality:</strong> 섹스 중 언어, 행동적 굴욕을 받으면 부정하면서도 흥분. 신체적, 정신적 고통에 흥분</li>`,
+                secret: `<p>겉으로는 잘난 척하지만 속은 누구보다 스스로를 혐오함.<br>독설은 자신의 나약함을 감추기 위한 방어 기제.<br>샤워시간 20분. 밤 기초화장품 6개. 의외로 대식가.</p>`
+            },
+            aidan: {
+                img: "https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/a411f45c-3c02-4670-83f6-c7a9a0592704.jpeg",
+                theme: "https://cheerful-fudge-ac30a5.netlify.app/aidan.mp3",
+                title: "Aidan Wild",
+                subtitle: "에이단 와일드 / 24세 / 아일랜드 더블린 출신 / 트럼펫터 (관악기 수석)",
+                info: `<li>신들린 텅킹(혀를 잘 씀. 키스나 혀로 애무 잘함). 목관/금관 통틀어 모든 관악기 단원 31명 중 수석일 정도로 뛰어난 실력.</li>
+                       <li><strong>외형:</strong> 붉은 머리카락, 금안, 185cm</li>
+                       <li><strong>성격:</strong> ESTP / 8w7 / Brat Tamer 성향<br>- 열정적, 자신감, 쾌활, 솔직함<br>- 거칠지만 의외로 순정적인 면이 있는 대형견(미친개)<br>- 절약, 공짜 좋아함. 자신의 트럼펫에 이름을 붙임(썬더볼트...)</li>
+                       <li><strong>Sexuality:</strong> 거친 리드. 뜨겁고 격정적인 행위 그 자체에 집중. 상대의 반항을 꺾는 것에 희열을 느낌.</li>`,
+                secret: `<p>그런 거 안 키움ㅋ<br>(주량 한 잔이라고 왜 말을 못해..!)</p>`
+            },
+            gideon: {
+                img: "https://d394jeh9729epj.cloudfront.net/8IEjvi4TCVi-KKKONEJaNFFC/e2b4363f-30c3-4046-b862-49fdb86e91c5.png",
+                theme: "https://cheerful-fudge-ac30a5.netlify.app/gideon_mix.mp3",
+                title: "Gideon Varga",
+                subtitle: "기데온 바르가 / 34세 / 독일 헝가리 출신 / 팀파니스트 (타악기 수석)",
+                info: `<li>악기의 울림과 힘조절 섬세함이 특기</li>
+                       <li><strong>외형:</strong> 잿빛 머리카락, 오렌지색 눈동자, 194cm</li>
+                       <li><strong>성격:</strong> ISTP / 9w8 / Primal 성향<br>- 무뚝뚝함, 묵직함, 말수 적음<br>- 한 번 눈이 뒤집히면 아무도 못말리는 짐승같은 면모</li>
+                       <li><strong>Sexuality:</strong> 체력으로 몰아붙이는 행위 선호. 심장박동과 호흡, 체취 등 본능적인 것에 집착.</li>`,
+                secret: `<p>알콜중독 아빠에게 학대 당함.<br>매일 매맞는 엄마를 보고 자라, '여자는 지켜야 하는 존재' 로 강하게 인식. 술취한 남자 PTSD</p>`
+            }
+        };
+
+        const modal = document.getElementById('charModal');
+        const modalImg = document.getElementById('modalImg');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalSubtitle = document.getElementById('modalSubtitle');
+        const modalInfo = document.getElementById('modalInfo');
+        const modalSecret = document.getElementById('modalSecret');
+
+        document.querySelectorAll('.char-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const char = card.getAttribute('data-char');
+                const data = charData[char];
+
+                modalImg.src = data.img;
+                modalTitle.innerText = data.title;
+                modalSubtitle.innerText = data.subtitle;
+                modalInfo.innerHTML = data.info;
+                modalSecret.innerHTML = data.secret;
+
+                // 테마곡 재생 로직
+                mainAudioStateBeforeModal = !audio.paused;
+                audio.pause();
+                themePlayer.src = data.theme;
+                themePlayer.play().catch(err => console.log("Theme play error:", err));
+
+                modal.classList.add('active');
+                document.body.classList.add('modal-open');
+            });
+        });
+
+        function closeModal() {
+            themePlayer.pause();
+            themePlayer.src = "";
+            
+            // 모달 닫을 때 메인 BGM이 원래 켜져 있었다면 다시 재생
+            if (mainAudioStateBeforeModal) {
+                audio.play();
+                toggleBtn.classList.add('playing');
+                statusText.innerText = "BGM ON";
+            }
+
+            modal.classList.remove('active');
+            document.body.classList.remove('modal-open');
+        }
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+    </script>
+</body>
+</html>
